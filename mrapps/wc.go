@@ -6,7 +6,7 @@ package main
 // go build -buildode=plugin wc.go
 //
 
-import "6.854/mr"
+import "6.5840/mr"
 import "unicode"
 import "strings"
 import "strconv"
@@ -24,7 +24,7 @@ func Map(filename string, contents string) []mr.KeyValue {
 	// split contents into an array of words
 	words := strings.FieldsFunc(contents, ff)
 
-	kva := []mr.KeyVAlue{}
+	kva := []mr.KeyValue{}
 	for _, w := range words {
 		kv := mr.KeyValue{w, "1"}
 		kva = append(kva, kv)
