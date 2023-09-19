@@ -45,7 +45,7 @@ func main(){
 		if err != nil {
 			log.Fatalf("cannot read %v", filename)
 		}
-		file.close()
+		file.Close()
 		kva := mapf(filename, string(content))
 		intermediate = append(intermediate, kva...)
 	}
@@ -63,5 +63,45 @@ func main(){
 	// call Reduce on each distinct key in intermediate[],
 	// and print the result to mr-out-0.
 	//
-	
+	i := 0
+	for i < len(intermediate){
+		j := i + 1
+		for j < len(intermediate) && intermediate[j].Key == intermediate[i].Key {
+			j ++
+		}
+		values := []string{}
+		for k := i; k < j; k ++ {
+			values = append(values, intermediate[k].Value)
+		}
+		output := reducef(intermediate[i].Key, values)
+		
+		// this is the correct format for each line of Reduce output
+		fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
+		
+		i = j
+	}
+	ofile.Close()
 }
+
+// load the application Map and Reduce functions
+// from a plugin file, e.g. ../mrapps/wc.so
+func loadPlugin(filename string) (func(string, string) []mr.KeyValue, func(string, []string) string) {
+	p, err := plugin.Open(filename)
+	if err != nil {
+		log.Fatalf("cannot load plugin %v", filename)
+	}
+	xmapf, err := p.Lookup("Map")
+	if err != nil {
+		log.Fatalf("cannot find Map in %v", filename)
+	}
+	mapf := xmapf.(func(string, string) []mr.KeyValue)
+	
+	xreducef, err := p.Lookup("Reduce")
+	if err != nil {
+		log.Fatalf("cannot find Reduce in %v", filename)
+	}
+	reducef := xreducef.(func(string, []string) string)
+	
+	return mapf, reducef
+}
+
