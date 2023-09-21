@@ -27,8 +27,33 @@ func ihash(key string) int {
 // main/mrworker.go calls this function.
 //
 func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string) string){
-	// todo: worker implementation here
-	
+	for {
+		args := GetTaskArgs{}
+		reply := GetTaskReply{}
+		
+		// this will wait until we get assigned a task
+		call("Coordinator.HandleGetTask", &args, &reply)
+
+		switch reply.TaskType {
+		case Map:
+			performMap(reply.MapFile, reply.TaskNum, reply.NReduceTasks, mapf)
+		case Reduce:
+			performReduce(reply.TaskNum, reply.NMapTasks, reducef)
+		case Done:
+			os.Exit(0)
+		default:
+			fmt.Errorf("Bad task type? %s", reply.TaskType)
+		}
+
+		// tell coordinator that we're done
+		finargs := FinishedTaskArgs {
+			TaskType: reply.TaskType,
+			TaskNum: reply.TaskNum,
+		}
+		finreply := FinishedTaskReply{}
+		call("Coordinator.HandleFinishedTask", &finargs, &finreply)
+
+	}
 	// uncomment to send the Example RPC to the coordinator
 	// CallExample()
 }
@@ -38,6 +63,7 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 //
 // the RPC argument and reply types are define in rpc.go
 //
+/*
 func CallExample(){
 	// declare an argument structure
 	args := ExampleArgs{}
@@ -60,6 +86,7 @@ func CallExample(){
 		fmt.Printf("call failed!\n")
 	}
 }
+*/
 
 //
 // send a RPC request to the coordinator, wait for the response
