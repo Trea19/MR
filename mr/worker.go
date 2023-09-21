@@ -103,6 +103,68 @@ func performMap(filename string, taskNum int, nReduceTasks int, mapf func(string
 }
 
 //
+// implementation of reduce task.
+//
+func performReduce(taskNum int, nMapTasks int, reducef func(string, []string) string){
+	// get all intermediate files corresponding to this reduce task,
+	// and collecting the corresponding key-value pairs.
+	kva := []KeyValue{}
+	for m := 0; m < nMapTasks; m ++ {
+		iFileName := fmt.Sprintf("mr-%d-%d", m, taskNum) // get intermediate file name
+		file, err := os.Open(iFileName)
+		if err != nil {
+			log.Fatalf("cannot open %v", iFileName)
+		}
+
+		dec := json.NewDecoder(file)
+		for {
+			var kv KeyValue
+			if err := dec.Decode(&kv); err != nil {
+				break;
+			}
+			kva = append(kva, kv)
+		}
+
+		file.Close()
+	}
+
+	// sort the keys
+	sort.Sort(ByKey(kva))
+
+	// get temporary reduce file to write values
+	tmpFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		log.Fatal("cannot open temp file")
+	}
+	tmpFileName := tmpFile.Name()
+
+	// apply reducef to all values with the same key
+	key_begin := 0
+	for key_begin < len(kva){
+		key_end := key_begin + 1
+		// find the positon of the last same key
+		for key_end < len(kva) && kva[key_begin].Key == kva[key_end].Key{
+			key_end ++
+		}
+		// values for reducef
+		values := []string{}
+		for k := key_begin; k < key_end; k ++ {
+			values = append(values, kva[k].Value)
+		}
+		// reducef
+		output := reducef(kva[key_begin].Key, values)
+		// write output to reduce task tmp file
+		fmt.Fprintf(tmpFile, "%v %v\n", kva[key_begin].Key, output)
+		// update key_begin
+		key_begin = key_end
+	}
+
+	// atomically rename temp file to final reduce task file.
+	finalizeReduceFile(tmpFileName, taskNum)
+
+}
+
+//
 // main/mrworker.go calls this function.
 //
 func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string) string){
