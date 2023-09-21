@@ -29,16 +29,56 @@ type Coordinator struct {
 
 }
 
-
-// todo -- RPC handlers for the worker to call
-
 // 
 // an example RPC handler
 // 
 // the RPC argument and reply types are defined in rpc.go
 //
+/*
 func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	reply.Y = args.X + 1
+	return nil
+}
+*/
+
+//
+// Handle GetTask RPCs from workers.
+//
+func (c *Coordinator) HandleGetTask(args *GetTaskArgs, reply *GetTaskReply) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	reply.NReduceTasks = c.nReduceTasks
+	reply.NMapTasks = c.nMapTasks
+
+	// todo: issue map/reduce tasks
+
+	// if all map and reduce tasks are done, 
+	// send the querying worker a Done TaskType,
+	// and set isDone to True
+	reply.TaskType = Done
+	c.isDone = true
+
+	return nil
+
+}
+
+//
+// Handle FinishedTask RPCs from workers.
+//
+func (c *Coordinator) HandleFinishedTask(args *FinishedTaskArgs, reply *FinishedTaskReply) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	swich args.TaskType {
+	case Map:
+		c.mapTasksFinished[args.TaskNum] = true
+	case Reduce:
+		c.reduceTasksFinished[args.TaskNum] = true
+	default:
+		log.Fatalf("Bad finished task? %s", args.TaskType)
+	}
+
 	return nil
 }
 
