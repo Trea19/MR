@@ -49,6 +49,58 @@ func finalizeIntermediateFile(tmpFile string, mapTaskN int, reduceTaskN int){
 	os.Rename(tmpFile, finalFileName)
 }
 
+//
+// implementation of map task.
+//
+func performMap(filename string, taskNum int, nReduceTasks int, mapf func(string, string) []KeyValue){
+	// read contents
+	file, err := os.Open(filename)
+	if err != nil{
+		log.Fatalf("cannot open %v", filename)
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatalf("cannot read %v", filename)
+	}
+	file.Close()
+
+	// apply mapf to contents of file, 
+	// and collect kv pairs
+	kva := mapf(filename, string(content))
+
+	// create temporary files and encoders for each file
+	tmpFiles := []*os.File{}
+	tmpFileNames := []string{}
+	encoders := []*json.Encoder{}
+	for i:= 0; i < nReduceTasks; i ++ {
+		tmpFile, err := ioutil.TempFile("","")
+		if err != nil{
+			log.Fatal("cannot open temp file")
+		}
+		tmpFiles = append(tmpFiles, tmpFile)
+		tmpFileName := tmpFile.Name()
+		tmpFileNames = append(tmpFileNames, tmpFilenName)
+		enc := json.NewEncoder(tmpFile)
+		encoders = append(encoders, enc)
+	}
+
+	// write output keys to appropriate (temporary!) intermeidate files,
+	// using ihash function above
+	for _, kv := range kva {
+		r := ihash(kv.Key) % nReduceTasks
+		encoders[r].Encode(&kv)
+	}
+
+	// close tmp files
+	for _, f := range tmpFiles {
+		f.Close()
+	}
+
+	// atomically rename temp files to final intermediate files
+	for i := 0; i < nReduceTasks; i ++ {
+		finalizeIntermediateFile(tmpFileNames[i], taskNum, i)
+	}
+}
 
 //
 // main/mrworker.go calls this function.
