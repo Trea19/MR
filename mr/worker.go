@@ -24,6 +24,33 @@ func ihash(key string) int {
 }
 
 //
+// for sorting by key.
+///
+type ByKey []KeyValue
+
+func (a ByKey) len() int  {return len(a)}
+func (a ByKey) Swap(i,j int) {a[i],a[j] = a[j],a[i]}
+func (a ByKey) Less(i,j int) bool {return a[i].Key < a[j].Key}
+
+
+//
+// finalizeReduceFile atomically renames temporary reduce file to a completed reduce task file.
+//
+func finalizeReduceFile(tmpFile string, taskN int){
+	finalFileName := fmt.Sprintf("mr-out-%d", taskN)
+	os.Rename(tmpFile, fileFileName)
+}
+
+//
+// finalizeIntermediateFile atomically renames temporary intermediate file to a completed intermediate file.
+//
+func finalizeIntermediateFile(tmpFile string, mapTaskN int, reduceTaskN int){
+	finalFileName := fmt.Sprintf("mr-%d-%d", mapTaskN, reduceTaskN)
+	os.Rename(tmpFile, finalFileName)
+}
+
+
+//
 // main/mrworker.go calls this function.
 //
 func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string) string){
