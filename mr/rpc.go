@@ -56,7 +56,18 @@ type GetTaskReply struct {
 	NMapTasks int
 }
 
+//
+// FinishTask RPCs are sent from idle workers to coordinator to indicate that a task has been completed.
+//
+type FinishTaskArgs struct {
+	// what type of the task was the worker assigned?
+	TaskType TaskType
 
+	// which task was it?
+	TaskNum int
+}
+// workers don't need to get a reply
+type FinishTaskReply struct {}
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the coordinator.
