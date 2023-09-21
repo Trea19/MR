@@ -5,9 +5,28 @@ import "net"
 import "os"
 import "net/rpc"
 import "net/http"
+import "time"
+import "sync"
 
 type Coordinator struct {
-	// todo: definitions
+	// protect coordinator state from concurrent access
+	mu sync.Mutex
+
+	// nMap == len(mapfiles)
+	mapFiles  []string
+	nMapTasks  int
+	nReduceTasks  int
+
+	// keep trace of when tasks are assigned,
+	// and which tasks have finished.
+	mapTasksIssued  []time.Time
+	mapTasksFinished  []bool
+	reduceTasksIssued  []time.Time
+	reduceTasksFinished  []bool
+
+	// set to True when all reduce tasks are comleted
+	isDone  bool
+
 }
 
 
