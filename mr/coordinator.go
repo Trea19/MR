@@ -51,7 +51,62 @@ func (c *Coordinator) HandleGetTask(args *GetTaskArgs, reply *GetTaskReply) erro
 	reply.NReduceTasks = c.nReduceTasks
 	reply.NMapTasks = c.nMapTasks
 
-	// todo: issue map/reduce tasks
+	// issue map tasks util there is no map tasks left
+	for {
+		mapDone := true
+		for m, done := range c.mapTasksFinished {
+			if !done {
+				// assign a task if it's either never been issued, or if it's been 
+				// too long since it was issued so the worker may crashed.
+				// NOTE: if task has never been issued, time is intialized to 0
+				if c.mapTasksIssued[m].IsZero() || time.Since(c.mapTasksIssued[m]).Seconds() > 10 {
+					reply.TaskType = Map
+					reply.TaskNum = m
+					reply.MapFile = c.mapFiles[m]
+					c.mapTasksIssued[m] = time.Now()
+					return nil
+				} else {
+					mapDone = false
+				}
+			}
+		}
+
+		// if all map tasks are in progress and haven't timed out, wait to give another task
+		if !mapDone {
+			// todo:wait
+		} else {
+			// we are done with all map tasks.
+			break
+		}
+	}
+
+	// all map tasks are done, issue reduce tasks now
+	for {
+		reduceDone := true
+		for m, done := range c.reduceTasksFinished {
+			if !done {
+				// assign a task if it's either never been issued, or if it's been
+				// too long since it was issued so the worker may crashed.
+				// NOTE: if task has never been issued, time is intialized to 0
+				if c.reduceTasksIssued[m].IsZero() || time.Since(c.reduceTasksIssued[m]).Seconds() > 10 {
+					reply.TaskType = Reduce
+					reply.TaskNum = m
+					reply.reduceTasksIssued[m] = time.Now()
+					return nil
+				} else {
+					reduceDone = false
+				}
+			}
+		}
+
+		// if all reduce tasks are in progress and haven't timed out, wait to give another task
+		if !reduceDone {
+			// todo: wait
+		} else {
+			// we are done with are reduce tasks.
+			break
+		}
+	}
 
 	// if all map and reduce tasks are done, 
 	// send the querying worker a Done TaskType,
