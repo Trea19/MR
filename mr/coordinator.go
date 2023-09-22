@@ -12,6 +12,10 @@ type Coordinator struct {
 	// protect coordinator state from concurrent access
 	mu sync.Mutex
 
+	// allow coordinator to wait to assign reduce tasks until map tasks have finished,
+	// or when all tasks are assigned and are running.
+	cond *sync.Cond
+
 	// nMap == len(mapfiles)
 	mapFiles  []string
 	nMapTasks  int
@@ -73,7 +77,7 @@ func (c *Coordinator) HandleGetTask(args *GetTaskArgs, reply *GetTaskReply) erro
 
 		// if all map tasks are in progress and haven't timed out, wait to give another task
 		if !mapDone {
-			// todo:wait
+			c.cond.Wait()
 		} else {
 			// we are done with all map tasks.
 			break
@@ -101,7 +105,7 @@ func (c *Coordinator) HandleGetTask(args *GetTaskArgs, reply *GetTaskReply) erro
 
 		// if all reduce tasks are in progress and haven't timed out, wait to give another task
 		if !reduceDone {
-			// todo: wait
+			c.cond.Wait()
 		} else {
 			// we are done with are reduce tasks.
 			break
@@ -134,6 +138,9 @@ func (c *Coordinator) HandleFinishedTask(args *FinishedTaskArgs, reply *Finished
 		log.Fatalf("Bad finished task? %s", args.TaskType)
 	}
 
+	// wake up the GetTask handler loop
+	c.cond.Broadcast()
+
 	return nil
 }
 
@@ -143,7 +150,7 @@ func (c *Coordinator) HandleFinishedTask(args *FinishedTaskArgs, reply *Finished
 func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
-	
+
 	sockname := coordinatorSock()
 	os.Remove(sockname)
 	l, e := net.Listen("unix", sockname)
@@ -158,11 +165,10 @@ func (c *Coordinator) server() {
 // if the entire job has finished.
 //
 func (c *Coordinator) Done() bool{
-	ret := false
-	
-	// todo
-	
-	return ret
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.isDone()
 }
 
 //
@@ -172,9 +178,30 @@ func (c *Coordinator) Done() bool{
 //
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
-	
-	// todo
-	
+
+	c.cond = sync.NewCond(&c.mu)
+
+	c.mapFiles = files
+	c.nMapTasks = len(files)
+	c.mapTasksFinished = make([]bool, len(files))
+	c.mapTasksIssued = make([]time.Time, len(files))
+
+	c.nReduceTasks = nReduce
+	c.ReduceTasksFinished = make([]bool, nReduce)
+	c.ReduceTasksIssued = make([]time.Time, nReduce)
+
+	// wake up the GetTask handler thread every once in a while
+	// to check if some tasks haven't finished,
+	// so we can know to reisssue it
+	go func(){
+		for {
+			c.mu.Lock()
+			c.cond.Broadcast()
+			c.mu.Unlock()
+			time.Sleep(time.Second)
+		}
+	}()
+
 	c.server()
 	return &c
 }
