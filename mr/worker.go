@@ -1,9 +1,13 @@
 package mr
 
 import "fmt"
+import "os"
 import "log"
 import "net/rpc"
 import "hash/fnv"
+import "io/ioutil"
+import "encoding/json"
+import "sort"
 
 //
 // Map functions return a slice of KeyValue.
@@ -28,7 +32,7 @@ func ihash(key string) int {
 ///
 type ByKey []KeyValue
 
-func (a ByKey) len() int  {return len(a)}
+func (a ByKey) Len() int  {return len(a)}
 func (a ByKey) Swap(i,j int) {a[i],a[j] = a[j],a[i]}
 func (a ByKey) Less(i,j int) bool {return a[i].Key < a[j].Key}
 
@@ -38,7 +42,7 @@ func (a ByKey) Less(i,j int) bool {return a[i].Key < a[j].Key}
 //
 func finalizeReduceFile(tmpFile string, taskN int){
 	finalFileName := fmt.Sprintf("mr-out-%d", taskN)
-	os.Rename(tmpFile, fileFileName)
+	os.Rename(tmpFile, finalFileName)
 }
 
 //
@@ -79,7 +83,7 @@ func performMap(filename string, taskNum int, nReduceTasks int, mapf func(string
 		}
 		tmpFiles = append(tmpFiles, tmpFile)
 		tmpFileName := tmpFile.Name()
-		tmpFileNames = append(tmpFileNames, tmpFilenName)
+		tmpFileNames = append(tmpFileNames, tmpFileName)
 		enc := json.NewEncoder(tmpFile)
 		encoders = append(encoders, enc)
 	}

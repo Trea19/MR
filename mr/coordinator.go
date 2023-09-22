@@ -95,7 +95,7 @@ func (c *Coordinator) HandleGetTask(args *GetTaskArgs, reply *GetTaskReply) erro
 				if c.reduceTasksIssued[m].IsZero() || time.Since(c.reduceTasksIssued[m]).Seconds() > 10 {
 					reply.TaskType = Reduce
 					reply.TaskNum = m
-					reply.reduceTasksIssued[m] = time.Now()
+					c.reduceTasksIssued[m] = time.Now()
 					return nil
 				} else {
 					reduceDone = false
@@ -129,7 +129,7 @@ func (c *Coordinator) HandleFinishedTask(args *FinishedTaskArgs, reply *Finished
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	swich args.TaskType {
+	switch args.TaskType {
 	case Map:
 		c.mapTasksFinished[args.TaskNum] = true
 	case Reduce:
@@ -168,7 +168,7 @@ func (c *Coordinator) Done() bool{
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return c.isDone()
+	return c.isDone
 }
 
 //
@@ -187,8 +187,8 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c.mapTasksIssued = make([]time.Time, len(files))
 
 	c.nReduceTasks = nReduce
-	c.ReduceTasksFinished = make([]bool, nReduce)
-	c.ReduceTasksIssued = make([]time.Time, nReduce)
+	c.reduceTasksFinished = make([]bool, nReduce)
+	c.reduceTasksIssued = make([]time.Time, nReduce)
 
 	// wake up the GetTask handler thread every once in a while
 	// to check if some tasks haven't finished,
